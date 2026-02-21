@@ -56,3 +56,12 @@ defmodule FetchFlight.Flights do
         }
   defstruct [:type, :price, :airlines, :flights, :carbon]
 end
+
+defmodule FetchFlight.PriceGraphOffer do
+  @type t :: %__MODULE__{
+          start_date: String.t() | nil,
+          return_date: String.t() | nil,
+          price: float() | nil
+        }
+  defstruct [:start_date, :return_date, :price]
+end

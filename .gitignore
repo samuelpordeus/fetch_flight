@@ -24,3 +24,6 @@ fetch_flight-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Claude folder
+/.claude/

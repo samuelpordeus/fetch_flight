@@ -5,6 +5,11 @@
 
 Elixir port of the Python [`fast_flights`](https://github.com/AWeirdDev/flights) library. Scrapes Google Flights by encoding a query as a protobuf binary, fetching the results page, and returning structured flight data — no API key required.
 
+Two entry points:
+
+- `get_flights/2` — fetch specific itineraries for a given date
+- `get_price_graph/1` — fetch a calendar of cheapest prices across a date range
+
 ## Installation
 
 ```elixir
@@ -16,6 +21,8 @@ end
 ```
 
 ## Usage
+
+### `get_flights/2` — flight search
 
 ```elixir
 query = %{
@@ -82,7 +89,51 @@ query = %{
 }
 ```
 
+### `get_price_graph/1` — price calendar
+
+Returns the cheapest price for each departure date in a range — useful for finding the best days to fly.
+
+```elixir
+query = %{
+  range_start_date: "2026-03-01",
+  range_end_date:   "2026-03-31",
+  trip_length:      7,
+  src_airports:     ["SFO"],
+  dst_airports:     ["JFK"]
+}
+
+{:ok, offers} = FetchFlight.get_price_graph(query)
+```
+
+Results are sorted by `start_date` ascending:
+
+```
+[
+  %FetchFlight.PriceGraphOffer{start_date: "2026-03-01", return_date: "2026-03-08", price: 189.0},
+  %FetchFlight.PriceGraphOffer{start_date: "2026-03-02", return_date: "2026-03-09", price: 210.0},
+  ...
+]
+```
+
+#### Price graph query fields
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `:range_start_date` | `"YYYY-MM-DD"` | yes | First departure date to check |
+| `:range_end_date` | `"YYYY-MM-DD"` | yes | Last departure date to check |
+| `:trip_length` | `integer` | yes | Length of stay in days |
+| `:src_airports` | `[String.t()]` | one of src/dst required | Origin IATA codes |
+| `:src_cities` | `[String.t()]` | one of src/dst required | Origin city names |
+| `:dst_airports` | `[String.t()]` | one of src/dst required | Destination IATA codes |
+| `:dst_cities` | `[String.t()]` | one of src/dst required | Destination city names |
+| `:trip` | atom | no | `:round_trip` (default), `:one_way` |
+| `:seat` | atom | no | `:economy` (default), `:premium_economy`, `:business`, `:first` |
+| `:passengers` | `[atom]` | no | Same values as `get_flights/2`, defaults to `[:adult]` |
+| `:stops` | atom | no | `:any` (default), `:nonstop`, `:one_stop`, `:two_stops` |
+
 ## Output
+
+### `get_flights/2`
 
 ```elixir
 {:ok, {%FetchFlight.JsMetadata{airlines: [...], alliances: [...]}, flights}}
@@ -116,11 +167,33 @@ query = %{
 - `:date` — `[year, month, day]`
 - `:time` — `[hour, minute]`, or `[hour]` when minutes = 0
 
+### `get_price_graph/1`
+
+```elixir
+{:ok, [%FetchFlight.PriceGraphOffer{}, ...]}
+```
+
+Each `%FetchFlight.PriceGraphOffer{}` has:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `:start_date` | `String.t()` | Departure date (`"YYYY-MM-DD"`) |
+| `:return_date` | `String.t()` | Return date (`"YYYY-MM-DD"`), `nil` for one-way |
+| `:price` | `float()` | Cheapest price found for that departure date |
+
 ## How it works
+
+### `get_flights/2`
 
 1. **Encode** — the query is serialized as a protobuf binary (manually encoded, no generated code) and Base64-encoded into the `tfs` URL parameter.
 2. **Fetch** — `GET https://www.google.com/travel/flights?tfs=...&hl=...&curr=...` with realistic browser headers via [`req`](https://github.com/wojtekmach/req).
 3. **Parse** — [`floki`](https://github.com/philss/floki) locates the `<script class="ds:1">` tag; [`jason`](https://github.com/michalmuskala/jason) decodes the embedded JSON payload; specific array indices are navigated to extract flights, prices, and carbon data.
+
+### `get_price_graph/1`
+
+1. **Encode** — the query is serialized in Google's internal JSPB format (non-standard JSON built by string concatenation, reverse-engineered from [krisukox/google-flights-api](https://github.com/krisukox/google-flights-api)) and URL-encoded into the POST body.
+2. **Fetch** — `POST` to the `GetCalendarGraph` internal endpoint with the capability bitmask header `x-goog-ext-259736195-jspb`.
+3. **Parse** — the JSPB streaming response (prefixed with `)]}'\n`) is split into chunks, each decoded with `jason`, and offers are extracted and sorted by departure date.
 
 ## Disclaimer
 
