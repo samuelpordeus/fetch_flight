@@ -15,7 +15,7 @@ Two entry points:
 ```elixir
 def deps do
   [
-    {:fetch_flight, "~> 0.1"}
+    {:fetch_flight, "~> 0.2"}
   ]
 end
 ```
@@ -28,7 +28,7 @@ end
 query = %{
   data: [
     %{
-      date: "2026-03-15",
+      date: "2026-05-01",
       from_airport: %{code: "SFO"},
       to_airport: %{code: "JFK"},
       max_stops: nil,
@@ -80,8 +80,8 @@ FetchFlight.get_flights(query, language: "en", currency: "USD")
 ```elixir
 query = %{
   data: [
-    %{date: "2026-04-01", from_airport: %{code: "SFO"}, to_airport: %{code: "LHR"}, max_stops: nil, airlines: []},
-    %{date: "2026-04-10", from_airport: %{code: "LHR"}, to_airport: %{code: "CDG"}, max_stops: 0,   airlines: []}
+    %{date: "2026-06-01", from_airport: %{code: "SFO"}, to_airport: %{code: "LHR"}, max_stops: nil, airlines: []},
+    %{date: "2026-06-10", from_airport: %{code: "LHR"}, to_airport: %{code: "CDG"}, max_stops: 0,   airlines: []}
   ],
   seat: :business,
   trip: :multi_city,
@@ -95,25 +95,41 @@ Returns the cheapest price for each departure date in a range — useful for fin
 
 ```elixir
 query = %{
-  range_start_date: "2026-03-01",
-  range_end_date:   "2026-03-31",
+  range_start_date: "2026-05-01",
+  range_end_date:   "2026-05-31",
   trip_length:      7,
   src_airports:     ["SFO"],
   dst_airports:     ["JFK"]
 }
 
 {:ok, offers} = FetchFlight.get_price_graph(query)
+
+# With a different currency
+{:ok, offers} = FetchFlight.get_price_graph(query, currency: "EUR")
 ```
+
+### Options
+
+```elixir
+FetchFlight.get_price_graph(query, currency: "EUR")
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `:currency` | `"USD"` | ISO 4217 currency code |
 
 Results are sorted by `start_date` ascending:
 
 ```
 [
-  %FetchFlight.PriceGraphOffer{start_date: "2026-03-01", return_date: "2026-03-08", price: 189.0},
-  %FetchFlight.PriceGraphOffer{start_date: "2026-03-02", return_date: "2026-03-09", price: 210.0},
+  %FetchFlight.PriceGraphOffer{start_date: "2026-04-17", return_date: "2026-04-24", price: 219.0},
+  %FetchFlight.PriceGraphOffer{start_date: "2026-04-18", return_date: "2026-04-25", price: 246.0},
+  %FetchFlight.PriceGraphOffer{start_date: "2026-05-01", return_date: "2026-05-08", price: 231.0},
   ...
 ]
 ```
+
+> **Note:** Google's Price graph covers roughly ±5 weeks around the search date, so results may extend slightly outside the requested range.
 
 #### Price graph query fields
 
@@ -154,8 +170,8 @@ Results are sorted by `start_date` ascending:
     %FetchFlight.SingleFlight{
       from_airport: %FetchFlight.Airport{code: "SFO", name: "San Francisco International Airport"},
       to_airport:   %FetchFlight.Airport{code: "JFK", name: "John F. Kennedy International Airport"},
-      departure: %FetchFlight.SimpleDatetime{date: [2026, 3, 15], time: [7, 0]},
-      arrival:   %FetchFlight.SimpleDatetime{date: [2026, 3, 15], time: [15, 28]},
+      departure: %FetchFlight.SimpleDatetime{date: [2026, 5, 1], time: [7, 0]},
+      arrival:   %FetchFlight.SimpleDatetime{date: [2026, 5, 1], time: [15, 28]},
       duration_minutes: 328,
       plane_type: "Boeing 767"
     }
@@ -191,9 +207,10 @@ Each `%FetchFlight.PriceGraphOffer{}` has:
 
 ### `get_price_graph/1`
 
-1. **Encode** — the query is serialized in Google's internal JSPB format (non-standard JSON built by string concatenation, reverse-engineered from [krisukox/google-flights-api](https://github.com/krisukox/google-flights-api)) and URL-encoded into the POST body.
-2. **Fetch** — `POST` to the `GetCalendarGraph` internal endpoint with the capability bitmask header `x-goog-ext-259736195-jspb`.
-3. **Parse** — the JSPB streaming response (prefixed with `)]}'\n`) is split into chunks, each decoded with `jason`, and offers are extracted and sorted by departure date.
+1. **Encode** — the query (both outbound and return legs) is serialized as a protobuf binary and Base64-encoded into the `tfs` URL parameter, same as `get_flights/2`. Including both legs tells Google the intended trip length.
+2. **Navigate** — a headless Chromium browser (via [`playwright`](https://hex.pm/packages/playwright)) loads the Google Flights results page, dismisses any deal popup, scrolls to the "Prices for nearby dates" section, and clicks the "Price graph" tab.
+3. **Intercept** — a response listener captures the `GetCalendarGraph` XHR that fires when the Price graph tab is clicked. This endpoint returns ~10 weeks of daily prices, one entry per departure date at exactly the requested trip length.
+4. **Parse** — the response (prefixed with `)]}'\n`) is decoded with `jason`. The outer envelope is unwrapped, the inner JSON string is decoded, and `[departure_date, return_date, [[null, price], token], 1]` entries are filtered to the requested date range and sorted by departure date.
 
 ## Disclaimer
 

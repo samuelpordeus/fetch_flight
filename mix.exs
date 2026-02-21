@@ -1,7 +1,7 @@
 defmodule FetchFlight.MixProject do
   use Mix.Project
 
-  @version "0.2.0"
+  @version "0.2.1"
   @source_url "https://github.com/samuelpordeus/fetch_flight"
 
   def project do
@@ -44,6 +44,7 @@ defmodule FetchFlight.MixProject do
       {:req, "~> 0.5"},
       {:floki, "~> 0.38"},
       {:jason, "~> 1.4"},
+      {:playwright, "~> 1.49.1-alpha.2"},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}
     ]
   end

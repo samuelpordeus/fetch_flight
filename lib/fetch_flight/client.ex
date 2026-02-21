@@ -12,14 +12,24 @@ defmodule FetchFlight.Client do
 
   @price_graph_url "https://www.google.com/_/FlightsFrontendUi/data/travel.frontend.flights.FlightsFrontendService/GetCalendarGraph"
 
+  @price_graph_params [
+    {"f.sid", "-8920707734915550076"},
+    {"bl", "boq_travel-frontend-ui_20230627.07_p1"},
+    {"hl", "en"},
+    {"soc-app", "162"},
+    {"soc-platform", "1"},
+    {"soc-device", "1"},
+    {"_reqid", "261464"},
+    {"rt", "c"}
+  ]
+
   # x-goog-ext-259736195-jspb is a capability bitmask sent to the Google Flights
-  # internal API. The feature IDs (48764689, 47907128, etc.) were extracted from
-  # the Go reference implementation at krisukox/google-flights-api. If Google
-  # rotates this header, requests will return 403.
+  # internal API. The feature IDs were extracted from the Go reference implementation
+  # at krisukox/google-flights-api. If Google rotates this header, requests will return 403.
   @price_graph_headers [
     {"Content-Type", "application/x-www-form-urlencoded;charset=UTF-8"},
     {"x-goog-ext-259736195-jspb",
-     ~s(["en-US","US","USD",1,null,[-120],null,[[48764689,47907128,48676280,48710756,48627726,48480739,47907128]],1])},
+     ~s(["en-US","US","USD",1,null,[-120],null,[[48764689,47907128,48676280,48710756,48627726,48480739,48593234,48707380]],1,[]])},
     {"User-Agent",
      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"},
     {"Accept-Language", "en-US,en;q=0.9"}
@@ -46,7 +56,7 @@ defmodule FetchFlight.Client do
   """
   def fetch_price_graph(form_body) do
     case Req.post(@price_graph_url,
-           params: [hl: "en", gl: "US"],
+           params: @price_graph_params,
            headers: @price_graph_headers,
            body: form_body,
            decode_body: false

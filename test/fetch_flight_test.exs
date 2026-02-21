@@ -5,35 +5,44 @@ defmodule FetchFlightTest do
   # Run with: mix test --include integration
   @moduletag :integration
 
-  @flights_query %{
-    data: [
-      %{
-        date: "2026-03-15",
-        from_airport: %{code: "SFO"},
-        to_airport: %{code: "JFK"},
-        max_stops: nil,
-        airlines: []
-      }
-    ],
-    seat: :economy,
-    trip: :one_way,
-    passengers: [:adult]
-  }
+  defp flights_query do
+    date = Date.utc_today() |> Date.add(30) |> Date.to_iso8601()
 
-  @price_graph_query %{
-    range_start_date: "2026-03-01",
-    range_end_date: "2026-03-31",
-    trip_length: 7,
-    src_airports: ["SFO"],
-    dst_airports: ["JFK"],
-    trip: :round_trip,
-    seat: :economy,
-    passengers: [:adult]
-  }
+    %{
+      data: [
+        %{
+          date: date,
+          from_airport: %{code: "SFO"},
+          to_airport: %{code: "JFK"},
+          max_stops: nil,
+          airlines: []
+        }
+      ],
+      seat: :economy,
+      trip: :one_way,
+      passengers: [:adult]
+    }
+  end
+
+  defp price_graph_query do
+    start_date = Date.utc_today() |> Date.add(30) |> Date.to_iso8601()
+    end_date = Date.utc_today() |> Date.add(60) |> Date.to_iso8601()
+
+    %{
+      range_start_date: start_date,
+      range_end_date: end_date,
+      trip_length: 14,
+      src_airports: ["SFO"],
+      dst_airports: ["JFK"],
+      trip: :round_trip,
+      seat: :economy,
+      passengers: [:adult]
+    }
+  end
 
   describe "get_flights/1" do
     setup do
-      {:ok, {metadata, flights}} = FetchFlight.get_flights(@flights_query)
+      {:ok, {metadata, flights}} = FetchFlight.get_flights(flights_query())
       %{metadata: metadata, flights: flights}
     end
 
@@ -146,8 +155,9 @@ defmodule FetchFlightTest do
 
   describe "get_price_graph/1" do
     setup do
-      {:ok, offers} = FetchFlight.get_price_graph(@price_graph_query)
-      %{offers: offers}
+      query = price_graph_query()
+      {:ok, offers} = FetchFlight.get_price_graph(query)
+      %{offers: offers, trip_length: query.trip_length}
     end
 
     test "returns a non-empty offer list", %{offers: offers} do
@@ -176,9 +186,10 @@ defmodule FetchFlightTest do
       assert dates == Enum.sort(dates)
     end
 
-    test "return_date - start_date equals trip_length for every offer", %{offers: offers} do
-      trip_length = @price_graph_query.trip_length
-
+    test "return_date - start_date equals trip_length for every offer", %{
+      offers: offers,
+      trip_length: trip_length
+    } do
       Enum.each(offers, fn offer ->
         {:ok, start} = Date.from_iso8601(offer.start_date)
         {:ok, ret} = Date.from_iso8601(offer.return_date)
@@ -186,6 +197,17 @@ defmodule FetchFlightTest do
         assert Date.diff(ret, start) == trip_length,
                "expected trip_length=#{trip_length}, got #{Date.diff(ret, start)} for #{offer.start_date}"
       end)
+    end
+  end
+
+  describe "get_price_graph/1 with another currency" do
+    setup do
+      {:ok, brl_offers} = FetchFlight.get_price_graph(price_graph_query(), currency: "BRL")
+      %{brl_offers: brl_offers}
+    end
+
+    test "returns a non-empty offer list in BRL", %{brl_offers: brl_offers} do
+      assert length(brl_offers) > 0
     end
   end
 end

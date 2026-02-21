@@ -44,7 +44,7 @@ defmodule FetchFlight do
       # => [%FetchFlight.PriceGraphOffer{start_date: "2026-03-01", return_date: "2026-03-08", price: 189.0}, ...]
   """
 
-  alias FetchFlight.{Client, Parser, ProtoEncoder, PriceGraphRequest, PriceGraphParser}
+  alias FetchFlight.{Client, Parser, ProtoEncoder}
 
   @type flight_data :: %{
           required(:date) => String.t(),
@@ -104,15 +104,16 @@ defmodule FetchFlight do
   Returns the cheapest prices for each departure date in the given range,
   useful for finding the best days to fly.
 
+  ## Options
+
+    * `:currency` - ISO 4217 currency code, e.g. `"EUR"` (default: `"USD"`)
+
   Returns `{:ok, [PriceGraphOffer.t()]}` sorted by `start_date`, or `{:error, reason}`.
   """
-  @spec get_price_graph(price_graph_query()) ::
+  @spec get_price_graph(price_graph_query(), keyword()) ::
           {:ok, [FetchFlight.PriceGraphOffer.t()]} | {:error, term()}
-  def get_price_graph(query) do
-    with {:ok, body} <- PriceGraphRequest.build(query),
-         {:ok, resp} <- Client.fetch_price_graph(body),
-         {:ok, offers} <- PriceGraphParser.parse(resp) do
-      {:ok, offers}
-    end
+  def get_price_graph(query, opts \\ []) do
+    currency = Keyword.get(opts, :currency, "USD")
+    FetchFlight.PriceGraphBrowser.fetch(query, currency)
   end
 end
