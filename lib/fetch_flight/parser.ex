@@ -88,8 +88,17 @@ defmodule FetchFlight.Parser do
     airlines = payload |> at(7) |> at(1) |> at(1) |> parse_airlines()
     meta = %JsMetadata{alliances: alliances, airlines: airlines}
 
-    flight_rows = payload |> at(3) |> at(0)
-    flights = if is_list(flight_rows), do: Enum.flat_map(flight_rows, &parse_row/1), else: []
+    # payload[2][0] = "Top flights" curated picks (may include flights absent from [3][0])
+    # payload[3][0] = full "All flights" list
+    top_rows = payload |> at(2) |> at(0)
+    all_rows = payload |> at(3) |> at(0)
+
+    flights =
+      [top_rows, all_rows]
+      |> Enum.flat_map(fn rows ->
+        if is_list(rows), do: Enum.flat_map(rows, &parse_row/1), else: []
+      end)
+      |> Enum.uniq_by(fn f -> {f.price, f.airlines, f.type} end)
 
     {:ok, {meta, flights}}
   end
