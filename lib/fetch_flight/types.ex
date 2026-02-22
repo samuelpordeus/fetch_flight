@@ -41,9 +41,10 @@ end
 defmodule FetchFlight.JsMetadata do
   @type t :: %__MODULE__{
           airlines: [FetchFlight.Airline.t()],
-          alliances: [FetchFlight.Alliance.t()]
+          alliances: [FetchFlight.Alliance.t()],
+          link: String.t() | nil
         }
-  defstruct [:airlines, :alliances]
+  defstruct [:airlines, :alliances, :link]
 end
 
 defmodule FetchFlight.Flights do

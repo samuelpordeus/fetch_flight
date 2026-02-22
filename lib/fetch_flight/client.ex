@@ -39,9 +39,13 @@ defmodule FetchFlight.Client do
   Fetch Google Flights HTML for the given tfs parameter.
   Returns `{:ok, html_body}` or `{:error, reason}`.
   """
+  # tfu is a Google Flights capability flag. "EgQIABABIgA" enables full airline
+  # price results; omitting it or using other values returns fewer results.
+  @tfu "EgQIABABIgA"
+
   def fetch(tfs_param, language \\ "en", currency \\ "USD") do
     case Req.get(@url,
-           params: [tfs: tfs_param, hl: language, curr: currency],
+           params: [tfs: tfs_param, hl: language, curr: currency, tfu: @tfu],
            headers: @headers
          ) do
       {:ok, %{status: 200, body: body}} -> {:ok, body}

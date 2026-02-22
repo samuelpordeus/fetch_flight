@@ -61,16 +61,6 @@ defmodule FetchFlight do
           required(:passengers) => [:adult | :child | :infant_in_seat | :infant_on_lap]
         }
 
-  @doc """
-  Fetch and parse Google Flights results for the given query.
-
-  ## Options
-
-    * `:language` - BCP 47 language tag, e.g. `"en"` (default: `"en"`)
-    * `:currency` - ISO 4217 currency code, e.g. `"USD"` (default: `"USD"`)
-
-  Returns `{:ok, {JsMetadata.t(), [Flights.t()]}}` or `{:error, reason}`.
-  """
   @type price_graph_query() :: %{
           required(:range_start_date) => String.t(),
           required(:range_end_date) => String.t(),
@@ -85,6 +75,17 @@ defmodule FetchFlight do
           optional(:stops) => :any | :nonstop | :one_stop | :two_stops
         }
 
+  @doc """
+  Fetch and parse Google Flights results for the given query.
+
+  ## Options
+
+    * `:language` - BCP 47 language tag, e.g. `"en"` (default: `"en"`)
+    * `:currency` - ISO 4217 currency code, e.g. `"USD"` (default: `"USD"`)
+
+  Returns `{:ok, {JsMetadata.t(), [Flights.t()]}}` or `{:error, reason}`.
+  The `JsMetadata` struct includes a `link` field with the Google Flights URL for the query.
+  """
   @spec get_flights(query(), keyword()) ::
           {:ok, {FetchFlight.JsMetadata.t(), [FetchFlight.Flights.t()]}} | {:error, term()}
   def get_flights(query, opts \\ []) do
@@ -93,8 +94,9 @@ defmodule FetchFlight do
 
     with tfs <- ProtoEncoder.to_tfs_param(query),
          {:ok, html} <- Client.fetch(tfs, language, currency),
-         {:ok, result} <- Parser.parse(html) do
-      {:ok, result}
+         {:ok, {meta, flights}} <- Parser.parse(html) do
+      link = "https://www.google.com/travel/flights?tfs=#{tfs}&hl=#{language}&curr=#{currency}"
+      {:ok, {%{meta | link: link}, flights}}
     end
   end
 
