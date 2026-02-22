@@ -32,6 +32,11 @@ defmodule FetchFlight do
   Returns the cheapest price for each departure date in a range, sorted by
   `start_date` — useful for finding the best days to fly.
 
+  For round-trip queries, `trip_length` is required and `return_date` is set on
+  each offer. For one-way queries (`trip: :one_way`), `trip_length` is not used
+  and `return_date` is `nil`.
+
+      # Round-trip
       query = %{
         range_start_date: "2026-03-01",
         range_end_date:   "2026-03-31",
@@ -42,6 +47,18 @@ defmodule FetchFlight do
 
       {:ok, offers} = FetchFlight.get_price_graph(query)
       # => [%FetchFlight.PriceGraphOffer{start_date: "2026-03-01", return_date: "2026-03-08", price: 189.0}, ...]
+
+      # One-way
+      query = %{
+        range_start_date: "2026-03-01",
+        range_end_date:   "2026-03-31",
+        trip:             :one_way,
+        src_airports:     ["SFO"],
+        dst_airports:     ["JFK"]
+      }
+
+      {:ok, offers} = FetchFlight.get_price_graph(query)
+      # => [%FetchFlight.PriceGraphOffer{start_date: "2026-03-01", return_date: nil, price: 89.0}, ...]
   """
 
   alias FetchFlight.{Client, Parser, ProtoEncoder}
@@ -66,7 +83,7 @@ defmodule FetchFlight do
   @type price_graph_query() :: %{
           required(:range_start_date) => String.t(),
           required(:range_end_date) => String.t(),
-          required(:trip_length) => pos_integer(),
+          optional(:trip_length) => pos_integer(),
           optional(:src_airports) => [String.t()],
           optional(:src_cities) => [String.t()],
           optional(:dst_airports) => [String.t()],

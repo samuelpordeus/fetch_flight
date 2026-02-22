@@ -103,7 +103,35 @@ defmodule FetchFlight.PriceGraphBrowser do
   # Private helpers
   # ---------------------------------------------------------------------------
 
-  # Encode a full round-trip (outbound + return) so Google knows the trip_length.
+  # For one-way trips: encode only the outbound leg with trip: :one_way.
+  # No trip_length is needed since there is no return date to calculate.
+  defp build_tfs(%{trip: :one_way} = query) do
+    src = query |> Map.get(:src_airports, []) |> List.first()
+    dst = query |> Map.get(:dst_airports, []) |> List.first()
+    dep_date = Map.fetch!(query, :range_start_date)
+
+    outbound =
+      %{
+        date: dep_date,
+        from_airport: %{code: src},
+        to_airport: %{code: dst},
+        max_stops: nil,
+        airlines: []
+      }
+      |> maybe_put(:departure_time, Map.get(query, :departure_time))
+      |> maybe_put(:arrival_time, Map.get(query, :arrival_time))
+
+    flight_query = %{
+      data: [outbound],
+      seat: Map.get(query, :seat, :economy),
+      trip: :one_way,
+      passengers: Map.get(query, :passengers, [:adult])
+    }
+
+    ProtoEncoder.to_tfs_param(flight_query)
+  end
+
+  # For round-trip: encode outbound + return so Google knows the trip_length.
   # This ensures GetCalendarGraph returns entries at exactly trip_length days.
   defp build_tfs(query) do
     src = query |> Map.get(:src_airports, []) |> List.first()
@@ -158,7 +186,7 @@ defmodule FetchFlight.PriceGraphBrowser do
   defp parse_calendar_response(body, query) do
     range_start = Map.fetch!(query, :range_start_date)
     range_end = Map.fetch!(query, :range_end_date)
-    trip_length = Map.fetch!(query, :trip_length)
+    trip_length = Map.get(query, :trip_length)
 
     with {:ok, start_date} <- Date.from_iso8601(range_start),
          {:ok, end_date} <- Date.from_iso8601(range_end),
@@ -191,15 +219,28 @@ defmodule FetchFlight.PriceGraphBrowser do
     end
   end
 
-  # Each entry: [dep_date, ret_date, [[null, price_int], booking_token], 1]
+  # Round-trip entry: [dep_date, ret_date, [[null, price_int], booking_token], 1]
   defp to_offer([dep_str, ret_str, [[_, price] | _] | _], trip_length, start_date, end_date)
-       when is_binary(dep_str) and is_binary(ret_str) and is_integer(price) do
+       when is_binary(dep_str) and is_binary(ret_str) and is_integer(price) and
+              not is_nil(trip_length) do
     with {:ok, dep} <- Date.from_iso8601(dep_str),
          {:ok, ret} <- Date.from_iso8601(ret_str),
          true <- Date.diff(ret, dep) == trip_length,
          true <- Date.compare(dep, start_date) != :lt,
          true <- Date.compare(dep, end_date) != :gt do
       [%PriceGraphOffer{start_date: dep_str, return_date: ret_str, price: price * 1.0}]
+    else
+      _ -> []
+    end
+  end
+
+  # One-way entry: return date may be nil or absent; no trip_length validation.
+  defp to_offer([dep_str, _ret, [[_, price] | _] | _], nil, start_date, end_date)
+       when is_binary(dep_str) and is_integer(price) do
+    with {:ok, dep} <- Date.from_iso8601(dep_str),
+         true <- Date.compare(dep, start_date) != :lt,
+         true <- Date.compare(dep, end_date) != :gt do
+      [%PriceGraphOffer{start_date: dep_str, return_date: nil, price: price * 1.0}]
     else
       _ -> []
     end

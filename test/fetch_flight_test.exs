@@ -211,6 +211,56 @@ defmodule FetchFlightTest do
     end
   end
 
+  describe "get_price_graph/1 with one_way trip" do
+    setup do
+      start_date = Date.utc_today() |> Date.add(30) |> Date.to_iso8601()
+      end_date = Date.utc_today() |> Date.add(60) |> Date.to_iso8601()
+
+      query = %{
+        range_start_date: start_date,
+        range_end_date: end_date,
+        trip: :one_way,
+        src_airports: ["SFO"],
+        dst_airports: ["JFK"],
+        seat: :economy,
+        passengers: [:adult]
+      }
+
+      {:ok, offers} = FetchFlight.get_price_graph(query)
+      %{offers: offers}
+    end
+
+    test "returns a non-empty offer list", %{offers: offers} do
+      assert length(offers) > 0
+    end
+
+    test "every offer has a valid ISO 8601 start_date", %{offers: offers} do
+      Enum.each(offers, fn offer ->
+        assert {:ok, _} = Date.from_iso8601(offer.start_date),
+               "invalid start_date: #{inspect(offer.start_date)}"
+      end)
+    end
+
+    test "return_date is nil for every offer", %{offers: offers} do
+      Enum.each(offers, fn offer ->
+        assert is_nil(offer.return_date),
+               "expected nil return_date, got #{inspect(offer.return_date)}"
+      end)
+    end
+
+    test "every offer has a positive float price", %{offers: offers} do
+      Enum.each(offers, fn offer ->
+        assert is_float(offer.price) and offer.price > 0,
+               "expected positive float price, got #{inspect(offer.price)}"
+      end)
+    end
+
+    test "offers are sorted by start_date ascending", %{offers: offers} do
+      dates = Enum.map(offers, & &1.start_date)
+      assert dates == Enum.sort(dates)
+    end
+  end
+
   describe "get_price_graph/1 with time filters" do
     @departure_time {6, 12}
     @arrival_time {8, 14}
