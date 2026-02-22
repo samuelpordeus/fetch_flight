@@ -51,7 +51,9 @@ defmodule FetchFlight do
           required(:from_airport) => %{code: String.t()},
           required(:to_airport) => %{code: String.t()},
           optional(:max_stops) => non_neg_integer() | nil,
-          optional(:airlines) => [String.t()]
+          optional(:airlines) => [String.t()],
+          optional(:departure_time) => {0..23, 0..23} | nil,
+          optional(:arrival_time) => {0..23, 0..23} | nil
         }
 
   @type query :: %{
@@ -72,7 +74,9 @@ defmodule FetchFlight do
           optional(:seat) => :economy | :premium_economy | :business | :first,
           optional(:trip) => :round_trip | :one_way,
           optional(:passengers) => [:adult | :child | :infant_in_seat | :infant_on_lap],
-          optional(:stops) => :any | :nonstop | :one_stop | :two_stops
+          optional(:stops) => :any | :nonstop | :one_stop | :two_stops,
+          optional(:departure_time) => {0..23, 0..23} | nil,
+          optional(:arrival_time) => {0..23, 0..23} | nil
         }
 
   @doc """

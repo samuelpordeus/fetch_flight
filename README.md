@@ -74,6 +74,8 @@ FetchFlight.get_flights(query, language: "en", currency: "USD")
 | `:to_airport` | `%{code: "JFK"}` | IATA destination code |
 | `:max_stops` | `integer \| nil` | `nil` = any number of stops |
 | `:airlines` | `[String.t()]` | Filter by IATA airline code, e.g. `["UA", "AA"]` |
+| `:departure_time` | `{0..23, 0..23}` | Earliest and latest departure hour, e.g. `{6, 12}` |
+| `:arrival_time` | `{0..23, 0..23}` | Earliest and latest arrival hour, e.g. `{14, 23}` |
 
 ### Multi-city example
 
@@ -106,6 +108,9 @@ query = %{
 
 # With a different currency
 {:ok, offers} = FetchFlight.get_price_graph(query, currency: "EUR")
+
+# With time filters (afternoon departures, evening arrivals)
+{:ok, offers} = FetchFlight.get_price_graph(%{query | departure_time: {12, 18}, arrival_time: {14, 23}})
 ```
 
 ### Options
@@ -146,6 +151,8 @@ Results are sorted by `start_date` ascending:
 | `:seat` | atom | no | `:economy` (default), `:premium_economy`, `:business`, `:first` |
 | `:passengers` | `[atom]` | no | Same values as `get_flights/2`, defaults to `[:adult]` |
 | `:stops` | atom | no | `:any` (default), `:nonstop`, `:one_stop`, `:two_stops` |
+| `:departure_time` | `{0..23, 0..23}` | no | Earliest and latest departure hour, e.g. `{6, 12}` |
+| `:arrival_time` | `{0..23, 0..23}` | no | Earliest and latest arrival hour, e.g. `{14, 23}` |
 
 ## Output
 

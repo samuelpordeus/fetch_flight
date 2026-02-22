@@ -68,9 +68,21 @@ defmodule FetchFlight.ProtoEncoder do
         stops -> base <> encode_int(5, stops)
       end
 
+    with_dep =
+      case Map.get(fd, :departure_time) do
+        nil -> with_stops
+        {min_h, max_h} -> with_stops <> encode_int(8, min_h) <> encode_int(9, max_h)
+      end
+
+    with_arr =
+      case Map.get(fd, :arrival_time) do
+        nil -> with_dep
+        {min_h, max_h} -> with_dep <> encode_int(10, min_h) <> encode_int(11, max_h)
+      end
+
     airlines = Map.get(fd, :airlines, [])
 
-    Enum.reduce(airlines, with_stops, fn airline, acc ->
+    Enum.reduce(airlines, with_arr, fn airline, acc ->
       acc <> encode_string(6, airline)
     end)
   end

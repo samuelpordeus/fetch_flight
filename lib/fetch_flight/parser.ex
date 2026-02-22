@@ -99,6 +99,7 @@ defmodule FetchFlight.Parser do
         if is_list(rows), do: Enum.flat_map(rows, &parse_row/1), else: []
       end)
       |> Enum.uniq_by(fn f -> {f.price, f.airlines, f.type} end)
+      |> Enum.sort_by(& &1.price)
 
     {:ok, {meta, flights}}
   end

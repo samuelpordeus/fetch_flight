@@ -1,7 +1,7 @@
 defmodule FetchFlight.MixProject do
   use Mix.Project
 
-  @version "0.2.3"
+  @version "0.3.0"
   @source_url "https://github.com/samuelpordeus/fetch_flight"
 
   def project do
@@ -24,7 +24,7 @@ defmodule FetchFlight.MixProject do
   end
 
   def application do
-    [extra_applications: [:logger]]
+    [extra_applications: [:logger], mod: {FetchFlight.Application, []}]
   end
 
   defp description do

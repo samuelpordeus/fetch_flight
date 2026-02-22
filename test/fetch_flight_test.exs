@@ -1,5 +1,5 @@
 defmodule FetchFlightTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   # Integration tests hit the real Google Flights and are skipped by default.
   # Run with: mix test --include integration
@@ -208,6 +208,56 @@ defmodule FetchFlightTest do
 
     test "returns a non-empty offer list in BRL", %{brl_offers: brl_offers} do
       assert length(brl_offers) > 0
+    end
+  end
+
+  describe "get_price_graph/1 with time filters" do
+    @departure_time {6, 12}
+    @arrival_time {8, 14}
+
+    setup do
+      query =
+        price_graph_query()
+        |> Map.merge(%{departure_time: @departure_time, arrival_time: @arrival_time})
+
+      {:ok, offers} = FetchFlight.get_price_graph(query)
+      %{offers: offers, trip_length: query.trip_length}
+    end
+
+    test "returns a non-empty offer list", %{offers: offers} do
+      assert length(offers) > 0
+    end
+
+    test "every offer has valid ISO 8601 start_date and return_date", %{offers: offers} do
+      Enum.each(offers, fn offer ->
+        assert {:ok, _} = Date.from_iso8601(offer.start_date)
+        assert {:ok, _} = Date.from_iso8601(offer.return_date)
+      end)
+    end
+
+    test "every offer has a positive float price", %{offers: offers} do
+      Enum.each(offers, fn offer ->
+        assert is_float(offer.price) and offer.price > 0,
+               "expected positive float price, got #{inspect(offer.price)}"
+      end)
+    end
+
+    test "offers are sorted by start_date ascending", %{offers: offers} do
+      dates = Enum.map(offers, & &1.start_date)
+      assert dates == Enum.sort(dates)
+    end
+
+    test "return_date - start_date equals trip_length for every offer", %{
+      offers: offers,
+      trip_length: trip_length
+    } do
+      Enum.each(offers, fn offer ->
+        {:ok, start} = Date.from_iso8601(offer.start_date)
+        {:ok, ret} = Date.from_iso8601(offer.return_date)
+
+        assert Date.diff(ret, start) == trip_length,
+               "expected trip_length=#{trip_length}, got #{Date.diff(ret, start)} for #{offer.start_date}"
+      end)
     end
   end
 end
